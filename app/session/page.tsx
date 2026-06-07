@@ -23,9 +23,11 @@ function SessionContent() {
   const [answer, setAnswer] = useState("");
   const [hint, setHint] = useState<string | null>(null);
   const [evaluations, setEvaluations] = useState<AnswerEvaluation[]>([]);
+  const [answerTexts, setAnswerTexts] = useState<string[]>([]);
   const [currentEval, setCurrentEval] = useState<AnswerEvaluation | null>(null);
   const [loading, setLoading] = useState(true);
   const [evaluating, setEvaluating] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const loadQuestions = useCallback(async () => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("onboarding") : null;
@@ -77,6 +79,7 @@ function SessionContent() {
       const ev = await res.json();
       setCurrentEval(ev);
       setEvaluations((prev) => [...prev, ev]);
+      setAnswerTexts((prev) => [...prev, answer]);
     } catch {
       setCurrentEval(null);
     } finally {
@@ -84,10 +87,25 @@ function SessionContent() {
     }
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (current + 1 >= total) {
-      const sessionId = Date.now().toString();
-      router.push(`/report/${sessionId}`);
+      setSaving(true);
+      try {
+        const res = await fetch("/api/save-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionType, difficulty, market, focusAreas,
+            evaluations,
+            questions,
+            answerTexts,
+          }),
+        });
+        const { sessionId } = await res.json();
+        router.push(`/report/${sessionId}`);
+      } catch {
+        router.push("/dashboard");
+      }
       return;
     }
     setCurrent((c) => c + 1);
@@ -170,8 +188,8 @@ function SessionContent() {
                       <p className="text-[#6B7280]">{currentEval.strength}</p>
                     </div>
                   )}
-                  <button onClick={handleNext} className="w-full flex items-center justify-center gap-2 bg-[#4A7C6F] hover:bg-[#2E5C52] text-white font-medium py-3 rounded-xl transition-colors">
-                    {current + 1 >= total ? "See full report" : "Next question"} <ArrowRight size={15} />
+                  <button onClick={handleNext} disabled={saving} className="w-full flex items-center justify-center gap-2 bg-[#4A7C6F] hover:bg-[#2E5C52] disabled:opacity-60 text-white font-medium py-3 rounded-xl transition-colors">
+                    {saving ? <><Loader2 size={14} className="animate-spin" /> Saving...</> : <>{current + 1 >= total ? "See full report" : "Next question"} <ArrowRight size={15} /></>}
                   </button>
                 </div>
               ) : (

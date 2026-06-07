@@ -2,25 +2,53 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { ArrowRight, Zap, TrendingUp, BookOpen } from "lucide-react";
 import { getTipOfTheDay, gapTypeLabels, marketLabels, seniorityLabels } from "@/lib/data";
 import { OnboardingData } from "@/types";
 
-const recentSessions = [
-  { id: "1", date: "2025-05-10", type: "Quick session", score: 7.4 },
-  { id: "2", date: "2025-05-08", type: "Full session", score: 6.9 },
-  { id: "3", date: "2025-05-05", type: "Gap narrative", score: 8.1 },
-];
+const SESSION_TYPE_LABEL: Record<string, string> = {
+  full: "Full session",
+  quick: "Quick session",
+  narrative: "Gap narrative",
+};
+
+type SessionRow = {
+  id: string;
+  session_type: string;
+  overall_score: number;
+  completed_at: string;
+};
 
 export default function DashboardPage() {
+  const { data: authSession } = useSession();
   const [profile, setProfile] = useState<OnboardingData | null>(null);
-  const [name, setName] = useState("there");
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
   const tip = getTipOfTheDay();
 
   useEffect(() => {
     const stored = localStorage.getItem("onboarding");
     if (stored) setProfile(JSON.parse(stored));
   }, []);
+
+  useEffect(() => {
+    fetch("/api/get-sessions")
+      .then((r) => r.json())
+      .then(({ sessions: rows }) => setSessions((rows ?? []).slice().reverse().slice(0, 5)));
+  }, []);
+
+  const name = authSession?.user?.name?.split(" ")[0] ?? "there";
+
+  const daysThisWeek = (() => {
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const days = new Set(
+      sessions
+        .filter((s) => new Date(s.completed_at) > weekAgo)
+        .map((s) => new Date(s.completed_at).toDateString())
+    );
+    return days.size;
+  })();
 
   const steps = [
     {
@@ -31,18 +59,18 @@ export default function DashboardPage() {
       desc: "Turn your story into a confident interview answer",
     },
     {
-      done: false,
+      done: sessions.length > 0,
       label: "Start your first practice session",
       href: "/practice",
       icon: Zap,
       desc: "A short 4-question session to get you started",
     },
     {
-      done: false,
-      label: "Review your skills baseline",
-      href: "/practice?focus=technical",
+      done: sessions.length >= 3,
+      label: "Complete 3 practice sessions",
+      href: "/practice",
       icon: TrendingUp,
-      desc: "See where you stand on technical fundamentals",
+      desc: "Build consistency and track your improvement",
     },
   ];
 
@@ -56,9 +84,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Main column */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Return plan */}
           <section>
             <h2 className="font-semibold text-[#1B4F72] mb-4">Your return plan</h2>
             <div className="space-y-3">
@@ -87,10 +113,9 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Recent sessions */}
           <section>
             <h2 className="font-semibold text-[#1B4F72] mb-4">Recent sessions</h2>
-            {recentSessions.length === 0 ? (
+            {sessions.length === 0 ? (
               <div className="text-center py-10 text-[#6B7280] bg-white border border-[#E5E0D8] rounded-xl">
                 <p>No sessions yet.</p>
                 <Link href="/practice" className="text-[#4A7C6F] text-sm font-medium mt-2 inline-block hover:underline">
@@ -99,14 +124,16 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {recentSessions.map((s) => (
+                {sessions.map((s) => (
                   <div key={s.id} className="flex items-center justify-between bg-white border border-[#E5E0D8] rounded-xl px-5 py-3.5">
                     <div>
-                      <p className="font-medium text-[#1B4F72] text-sm">{s.type}</p>
-                      <p className="text-xs text-[#6B7280]">{new Date(s.date).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</p>
+                      <p className="font-medium text-[#1B4F72] text-sm">{SESSION_TYPE_LABEL[s.session_type] ?? s.session_type}</p>
+                      <p className="text-xs text-[#6B7280]">
+                        {new Date(s.completed_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </p>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="font-bold text-[#4A7C6F]">{s.score} / 10</span>
+                      <span className="font-bold text-[#4A7C6F]">{s.overall_score} / 10</span>
                       <Link href={`/report/${s.id}`} className="text-xs text-[#4A7C6F] hover:underline font-medium">
                         View report
                       </Link>
@@ -117,28 +144,24 @@ export default function DashboardPage() {
             )}
           </section>
 
-          {/* Quick start */}
           <Link
-            href="/practice?type=quick"
+            href="/practice"
             className="flex items-center justify-between bg-[#4A7C6F] hover:bg-[#2E5C52] text-white rounded-2xl p-7 transition-all group"
           >
             <div>
-              <p className="font-serif text-xl font-bold mb-1">Start a 5-question practice session</p>
+              <p className="font-serif text-xl font-bold mb-1">Start a practice session</p>
               <p className="text-[#E8F2EF] text-sm">~10 minutes · Returner-aware feedback</p>
             </div>
             <ArrowRight size={22} className="shrink-0 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-5">
-          {/* Tip of the day */}
           <div className="bg-[#E8F2EF] border border-[#4A7C6F]/20 rounded-xl p-5">
             <p className="text-xs font-semibold text-[#4A7C6F] uppercase tracking-wider mb-2">Tip of the day</p>
             <p className="text-sm text-[#1B4F72] leading-relaxed">{tip}</p>
           </div>
 
-          {/* Profile summary */}
           {profile && (
             <div className="bg-white border border-[#E5E0D8] rounded-xl p-5">
               <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-3">Your profile</p>
@@ -168,10 +191,9 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Streak */}
           <div className="bg-white border border-[#E5E0D8] rounded-xl p-5">
             <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-1">This week</p>
-            <p className="text-3xl font-bold font-serif text-[#4A7C6F]">0</p>
+            <p className="text-3xl font-bold font-serif text-[#4A7C6F]">{daysThisWeek}</p>
             <p className="text-sm text-[#6B7280]">days practiced</p>
           </div>
         </div>
