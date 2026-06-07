@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ReturnReady
 
-## Getting Started
+AI-powered interview coaching for engineers returning after a career break.
 
-First, run the development server:
+## Setup
 
 ```bash
+cp .env.example .env.local
+# Fill in your API keys
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Description |
+|---|---|
+| `OPENAI_API_KEY` | GPT-4o API key from platform.openai.com |
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `NEXTAUTH_SECRET` | Random secret — run `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | Your deployment URL (e.g. https://returnready.vercel.app) |
+| `GOOGLE_CLIENT_ID` | Google OAuth app client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth app client secret |
+| `EMAIL_SERVER` | SMTP server for magic link emails (optional) |
+| `EMAIL_FROM` | From address for magic link emails |
 
-## Learn More
+## Supabase schema
 
-To learn more about Next.js, take a look at the following resources:
+Run this SQL in your Supabase SQL editor:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sql
+create table users (
+  id uuid primary key default gen_random_uuid(),
+  email text unique,
+  name text,
+  created_at timestamp default now()
+);
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+create table profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users,
+  gap_type text,
+  gap_start date,
+  gap_end date,
+  target_role text,
+  seniority text,
+  target_market text,
+  confidence_baseline int,
+  narrative_brief text,
+  narrative_full text,
+  narrative_pivot text,
+  updated_at timestamp default now()
+);
 
-## Deploy on Vercel
+create table sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users,
+  session_type text,
+  focus_areas text[],
+  difficulty text,
+  market_style text,
+  overall_score decimal,
+  confidence_score decimal,
+  underselling_count int,
+  completed_at timestamp default now()
+);
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+create table session_answers (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid references sessions,
+  question_text text,
+  question_category text,
+  answer_text text,
+  score_clarity int,
+  score_depth int,
+  score_confidence int,
+  score_relevance int,
+  feedback text,
+  underselling_detected boolean,
+  underselling_phrases text[],
+  stronger_version text
+);
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy to Vercel
+
+1. Push to GitHub
+2. Go to vercel.com/new → import repo
+3. Add all environment variables from `.env.example`
+4. Deploy
