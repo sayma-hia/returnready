@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { Menu, X } from "lucide-react";
 
 const publicLinks = [
   { label: "How it works", href: "/#how-it-works" },
   { label: "About", href: "/about" },
-  { label: "Sign in", href: "/api/auth/signin" },
 ];
 
 const authLinks = [
@@ -20,6 +20,7 @@ const authLinks = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -29,10 +30,8 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
-  const isApp = ["/dashboard", "/narrative", "/practice", "/session", "/progress", "/report"].some(
-    (p) => pathname.startsWith(p)
-  );
-  const links = isApp ? authLinks : publicLinks;
+  const isSignedIn = !!session;
+  const links = isSignedIn ? authLinks : publicLinks;
 
   return (
     <nav
@@ -55,9 +54,7 @@ export default function Navbar() {
                 <Link
                   href={link.href}
                   className={`text-sm font-medium transition-colors ${
-                    isActive
-                      ? "text-[#4A7C6F]"
-                      : "text-[#6B7280] hover:text-[#1B4F72]"
+                    isActive ? "text-[#4A7C6F]" : "text-[#6B7280] hover:text-[#1B4F72]"
                   }`}
                 >
                   {link.label}
@@ -65,25 +62,34 @@ export default function Navbar() {
               </li>
             );
           })}
-          {isApp && (
+          {isSignedIn ? (
             <li>
-              <Link
-                href="/api/auth/signout"
-                className="text-sm text-[#6B7280] hover:text-[#1B4F72] transition-colors"
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="text-sm text-[#6B7280] hover:text-[#1B4F72] transition-colors font-medium"
               >
                 Sign out
-              </Link>
+              </button>
             </li>
-          )}
-          {!isApp && (
-            <li>
-              <Link
-                href="/onboard"
-                className="text-sm font-medium bg-[#4A7C6F] hover:bg-[#2E5C52] text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                Start for free
-              </Link>
-            </li>
+          ) : (
+            <>
+              <li>
+                <Link
+                  href="/api/auth/signin"
+                  className="text-sm font-medium text-[#6B7280] hover:text-[#1B4F72] transition-colors"
+                >
+                  Sign in
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/onboard"
+                  className="text-sm font-medium bg-[#4A7C6F] hover:bg-[#2E5C52] text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Start for free
+                </Link>
+              </li>
+            </>
           )}
         </ul>
 
@@ -110,7 +116,16 @@ export default function Navbar() {
                 </Link>
               </li>
             ))}
-            {!isApp && (
+            {isSignedIn ? (
+              <li className="pt-2">
+                <button
+                  onClick={() => { setMobileOpen(false); signOut({ callbackUrl: "/" }); }}
+                  className="block w-full text-left py-2 text-sm text-[#6B7280] hover:text-[#1B4F72] font-medium transition-colors"
+                >
+                  Sign out
+                </button>
+              </li>
+            ) : (
               <li className="pt-2">
                 <Link
                   href="/onboard"
